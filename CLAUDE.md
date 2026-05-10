@@ -22,7 +22,14 @@
    - `wiki/_index.md`：总索引，每次摄入都必须更新
 3. **链接规范**：必须使用 Obsidian 兼容的双向链接 `[[页面名]]`，大量使用，把所有页面连成网络。
 4. **格式要求**：每个页面首段必须是摘要；正文结构清晰；YAML frontmatter 包含 tags 和 source。
-5. **矛盾处理**：如果新知识和 wiki 中已有内容矛盾，不要直接覆盖。要在相关页面标记 `**⚠️ 待确认的矛盾：**...`，并在 `wiki/_index.md` 的矛盾追踪区记录。
+5. **YAML frontmatter 中的 wikilink**：YAML 中 `[` 是 flow sequence 起始符。所有含有 `[[wikilink]]` 的字段值必须用引号包裹。多值字段（如 `related`）使用 YAML list 格式，每个 wikilink 单独一行：
+   ```yaml
+   related:
+     - "[[page1]]"
+     - "[[page2]]"
+   ```
+   生成或修改 wiki 页面后，必须运行 `.claude/scripts/validate-yaml.py` 验证 frontmatter 合法性。
+6. **矛盾处理**：如果新知识和 wiki 中已有内容矛盾，不要直接覆盖。要在相关页面标记 `**⚠️ 待确认的矛盾：**...`，并在 `wiki/_index.md` 的矛盾追踪区记录。
 
 ## 四大核心操作
 
@@ -47,6 +54,7 @@
 
 ### 3. Lint（健康检查）
 当我说 `lint` 或使用 `/lint` 命令时，全面检查 wiki/ 目录：
+- YAML frontmatter 合法性（运行 `.claude/scripts/validate-yaml.py`）
 - 断开的 `[[链接]]`
 - 相互矛盾的信息（特别是不同来源对同一概念的不同定义）
 - 孤立页面（没有任何其他页面链接到它）
@@ -88,7 +96,8 @@
 ---
 tags: [复盘, <领域>, <偏差类型>]
 source: "[[raw/articles/源文件名]]"
-related: [[相关概念页]]
+related:
+  - "[[相关概念页]]"
 首次出现: YYYY-MM-DD
 复现次数: 1
 ---

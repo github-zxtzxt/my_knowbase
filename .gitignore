@@ -3,3 +3,7 @@ wiki
 outputs
 .obsidian
 .playwright-mcp
+.agents
+.idea
+skills-lock.json
+.claude/skills
