@@ -30,6 +30,7 @@
    ```
    生成或修改 wiki 页面后，必须运行 `.claude/scripts/validate-yaml.py` 验证 frontmatter 合法性。
 6. **矛盾处理**：如果新知识和 wiki 中已有内容矛盾，不要直接覆盖。要在相关页面标记 `**⚠️ 待确认的矛盾：**...`，并在 `wiki/_index.md` 的矛盾追踪区记录。
+7. **log.md 维护**：每次在 `wiki/log.md` 追加记录时，同步将其 frontmatter 中的 `updated` 字段更新为当前日期。Ingest、Reflect、Lint 操作均涉及此更新。
 
 ## 四大核心操作
 
