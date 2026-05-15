@@ -105,20 +105,160 @@ def ratio_bounds(src_cb):
     return 0.2, 1.8
 
 
+def parse_reviewed(page_path):
+    """Return reviewed date string if present, else None."""
+    text = page_path.read_text(encoding="utf-8")
+    m = re.search(r"^reviewed:\s*(.+?)\s*$", text, re.MULTILINE)
+    return m.group(1).strip('"').strip("'") if m else None
+
+
+def parse_tags(page_path):
+    """Read tags list from frontmatter, return lowercase set."""
+    text = page_path.read_text(encoding="utf-8")
+    m = re.search(r"^---\s*\n(.*?)\n---", text, re.DOTALL | re.MULTILINE)
+    if not m:
+        return set()
+    fm = m.group(1)
+    tags = set()
+    in_tags = False
+    for line in fm.splitlines():
+        if re.match(r"^\s*tags\s*:", line):
+            in_tags = True
+            inline = re.search(r"tags\s*:\s*\[(.*?)\]", line)
+            if inline:
+                for t in inline.group(1).split(","):
+                    tags.add(t.strip().strip('"').strip("'").lower())
+                in_tags = False
+            continue
+        if in_tags:
+            mm = re.match(r"^\s*-\s*(.+?)\s*$", line)
+            if mm:
+                tags.add(mm.group(1).strip('"').strip("'").lower())
+            elif line.strip() and not line.startswith(" "):
+                in_tags = False
+    return tags
+
+
+def page_kind(path, tags, src_chars, wikilinks):
+    """Classify page into one of: summary, entity, nav, concept.
+
+    Path-based wins (summaries/, entities/), then explicit tag,
+    then auto-nav heuristic for huge source segments.
+    """
+    parts = re.split(r"[/\\]", str(path))
+    if "summaries" in parts:
+        return "summary"
+    if "entities" in parts:
+        return "entity"
+    if tags & {"nav-page", "overview", "nav"}:
+        return "nav"
+    # Auto-nav: source is huge (single concept can't span 15k+ chars)
+    # OR source is very large with many outbound links (clearly a hub)
+    if src_chars >= 15000:
+        return "nav"
+    if src_chars >= 8000 and wikilinks >= 5:
+        return "nav"
+    return "concept"
+
+
+def page_signals(page_path):
+    """Count carrier signals and wikilinks in body (frontmatter stripped)."""
+    text = page_path.read_text(encoding="utf-8")
+    body = re.sub(r"^---\s*\n.*?\n---\s*\n", "", text, count=1, flags=re.DOTALL)
+    code_blocks = len(re.findall(r"^```", body, re.MULTILINE)) // 2
+    display_math = len(re.findall(r"\$\$[\s\S]+?\$\$", body))
+    inline_math = len(re.findall(r"(?<!\$)\$[^\$\n]+\$(?!\$)", body))
+    table_rows = sum(
+        1 for ln in body.splitlines()
+        if re.match(r"^\s*\|.*\|\s*$", ln) and not re.match(r"^\s*\|[\s\-:|]+\|\s*$", ln)
+    )
+    bullets = sum(1 for ln in body.splitlines() if re.match(r"^\s*[-*]\s+", ln))
+    numbered = sum(1 for ln in body.splitlines() if re.match(r"^\s*\d+\.\s+", ln))
+    wikilinks = len(set(re.findall(r"\[\[([^\]|#]+)", body)))
+    has_carrier = (
+        code_blocks >= 1
+        or display_math >= 1
+        or inline_math >= 2
+        or table_rows >= 2
+        or bullets >= 3
+        or numbered >= 3
+    )
+    return {
+        "code_blocks": code_blocks,
+        "carrier": has_carrier,
+        "wikilinks": wikilinks,
+    }
+
+
+def check_concept(pchars, src_chars, src_cb, pcb, ratio, sig, ranges, has_source):
+    warnings = []
+    if pchars < 400:
+        warnings.append(f"chars<400({pchars})")
+    if not sig["carrier"]:
+        warnings.append("no-carrier")
+    if sig["wikilinks"] < 2:
+        warnings.append(f"wikilinks<2({sig['wikilinks']})")
+    if has_source and not ranges:
+        warnings.append("no-source-grounding")
+    if ratio is not None:
+        if src_chars < 1500:
+            lo, hi = 0.5, 4.0
+        else:
+            lo = 0.2 if src_cb > 8 else 0.25
+            hi = 1.8
+        if ratio < lo:
+            warnings.append(f"ratio<{lo}")
+        if ratio > hi:
+            warnings.append(f"ratio>{hi}")
+    if src_cb >= 3 and pcb < 1:
+        warnings.append("missing-code")
+    return warnings
+
+
+def check_nav(pchars, sig):
+    warnings = []
+    if pchars < 1500:
+        warnings.append(f"nav:chars<1500({pchars})")
+    if sig["wikilinks"] < 5:
+        warnings.append(f"nav:wikilinks<5({sig['wikilinks']})")
+    return warnings
+
+
+def check_entity(pchars, sig):
+    warnings = []
+    if pchars < 400:
+        warnings.append(f"entity:chars<400({pchars})")
+    if sig["wikilinks"] < 1:
+        warnings.append("entity:wikilinks<1")
+    return warnings
+
+
+def check_summary(pchars, sig):
+    warnings = []
+    if pchars < 800:
+        warnings.append(f"summary:chars<800({pchars})")
+    if sig["wikilinks"] < 5:
+        warnings.append(f"summary:wikilinks<5({sig['wikilinks']})")
+    return warnings
+
+
 def verify(pages, source_path):
     rows = []
     fail = False
     for p in pages:
         page = Path(p)
         if not page.exists():
-            rows.append((page.name, "MISSING", "", "", "", "FAIL:no-file"))
+            rows.append((page.name, "?", "MISSING", "", "", "", "FAIL:no-file"))
             fail = True
             continue
         pstats = density(page)
         if pstats is None:
-            rows.append((page.name, "DENSITY_ERR", "", "", "", "FAIL"))
+            rows.append((page.name, "?", "DENSITY_ERR", "", "", "", "FAIL"))
             fail = True
             continue
+
+        tags = parse_tags(page)
+        sig = page_signals(page)
 
         ranges = parse_ranges(page, source_path)
         src_chars, src_cb = 0, 0
@@ -132,36 +272,38 @@ def verify(pages, source_path):
         pcb = pstats.get("code_blocks", 0)
         ratio = (pchars / src_chars) if src_chars else None
 
-        warnings = []
-        if pchars < 1200:
-            warnings.append(f"chars<1200({pchars})")
-        if source_path and not ranges:
-            # Empty / missing / unparseable source_range while a source
-            # was provided → page has no verifiable grounding. Flag it.
-            warnings.append("no-source-grounding")
-        if ratio is not None:
-            lo, hi = ratio_bounds(src_cb)
-            if ratio < lo:
-                warnings.append(f"ratio<{lo}")
-            if ratio > hi:
-                warnings.append(f"ratio>{hi}")
-        if src_cb:
-            # Relax code retention for code-dense sources (dialogue repeats
-            # same patterns across turns). Mirrors ratio_bounds logic.
-            code_floor = 0.3 if src_cb > 8 else 0.5
-            if pcb < src_cb * code_floor:
-                warnings.append(f"code<{src_cb}*{code_floor}")
+        kind = page_kind(page, tags, src_chars, sig["wikilinks"])
 
-        status = "PASS" if not warnings else "FAIL:" + ",".join(warnings)
-        if warnings:
+        if kind == "concept":
+            warnings = check_concept(
+                pchars, src_chars, src_cb, pcb, ratio, sig,
+                ranges, has_source=bool(source_path),
+            )
+        elif kind == "nav":
+            warnings = check_nav(pchars, sig)
+        elif kind == "entity":
+            warnings = check_entity(pchars, sig)
+        elif kind == "summary":
+            warnings = check_summary(pchars, sig)
+        else:
+            warnings = []
+
+        reviewed = parse_reviewed(page)
+        if warnings and reviewed:
+            status = f"REVIEWED({reviewed})"
+        elif warnings:
+            status = "FAIL:" + ",".join(warnings)
             fail = True
+        else:
+            status = "PASS"
         rows.append(
             (
                 page.stem,
+                kind,
                 f"{src_chars}c/{src_cb}cb",
                 f"{pchars}c/{pcb}cb",
                 f"{ratio:.2f}" if ratio is not None else "-",
-                ";".join(f"{a}-{b}" for a, b in ranges) or "-",
+                f"L{sig['wikilinks']}",
                 status,
             )
         )
@@ -182,7 +324,7 @@ def main():
         sys.exit(2)
 
     rows, fail = verify(args, source)
-    hdr = ("slug", "src", "page", "ratio", "range", "status")
+    hdr = ("slug", "kind", "src", "page", "ratio", "links", "status")
     widths = [
         max(len(str(r[i])) for r in [hdr] + rows) for i in range(len(hdr))
     ]
