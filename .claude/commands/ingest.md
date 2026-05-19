@@ -114,7 +114,7 @@ Agent({
 
 ## 输出
 直接输出完整的 .md 文件内容（含 frontmatter）。
-source 字段写 raw/ 源文件路径#行号，不可写 wiki 页名。
+sources 字段为 YAML list，每项指向 raw/ 源文件路径#行号，不可写 wiki 页名。
 slug: <slug>
 写入路径: wiki/concepts/<slug>.md
 ```
@@ -124,7 +124,7 @@ slug: <slug>
 python .claude/scripts/extract-segments.py --source <源文> --range <a>:<b>
 ```
 
-**merge 模式**：额外传入已有 wiki 页面内容。要求 writer 将新源文信息补充到对应小节、矛盾处标记而非覆盖、保留已有 `## 原文引用` 段并在其后追加新源文段落。
+**merge 模式**：额外传入已有 wiki 页面内容。要求 writer 将新源文信息补充到对应小节、矛盾处标记而非覆盖、保留已有 `## 更新记录` 并在表尾追加新行。
 
 Writer 完成后，orchestrator 把输出写入对应 `wiki/` 路径。
 
@@ -151,8 +151,8 @@ Writer 完成后，orchestrator 把输出写入对应 `wiki/` 路径。
 
 - **Writer 的 context 里只有它负责的那段源文**，不含其他章节、不含其他页面的输出
 - **代码和公式必须从 extract-segments 输出原样复制**，writer 不得自行重写
-- **source 字段必须指向 raw/ 源文件#行号**，不可指向另一个 wiki 页
-- **每个页面必须包含 `## 原文引用` 节**，保留源文原始段落
+- **`sources` 字段为 YAML list，每个元素指向 raw/ 源文件#行号**，不可指向 wiki 页。多来源时列出多条
+- **每个页面必须包含 `## 更新记录` 节**，记录时间、来源和变化
 - **Phase 1 概念表可改**——用户修改 `tmp/concepts.yaml` 后直接重跑 Phase 2，无需重读全文
 - **禁止任何 LLM sub-agent 修改已有页面**
 - **每个 sub-agent 独立运行**，互不依赖，可并行

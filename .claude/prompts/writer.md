@@ -8,11 +8,13 @@
 ---
 tags:
   - <领域标签>
-source: "[[raw/<源文件路径>#lines <a>-<b>]]"
+sources:
+  - "[[raw/<源文件路径>#lines <a>-<b>]]"
 aliases:
   - <中文译名或缩写>
 confidence: high | medium | low
-status: draft
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
 ---
 
 <一句话定义>
@@ -44,21 +46,23 @@ status: draft
 - 相关：[[yyy]]
 ```
 
-最后必须加原文引用节：
+最后必须加更新记录节：
 ```markdown
-## 原文引用
+## 更新记录
 
-<源文中该概念对应的原始段落，只追加不删改>
+| 日期 | 来源 | 变化 |
+|------|------|------|
+| YYYY-MM-DD | [[raw/<源文件路径>#lines <a>-<b>]] | 初始创建 |
 ```
 
 ## 铁律
 
 1. 已提取的代码块和公式原样复制，一字不改
-2. `source` 必须指向 `raw/` 下的源文件路径 + 行号，不可指向另一个 wiki 页
-3. `## 原文引用` 节必须保留源文原始段落，不可省略
+2. `sources` 为 YAML list，每个元素指向 `raw/` 下的源文件路径#行号，不可指向 wiki 页。多来源时列出多条
+3. `## 更新记录` 表格只追加不删改已有行。本次 ingest 在表尾新增一行
 4. `confidence` 根据信息充分程度和源文清晰度标注：high（源文详细且明确）/ medium（信息较简略）/ low（源文仅提及但缺乏细节）
 5. `aliases` 列出概念的中文译名、缩写、别称等，方便搜索和 Obsidian 发现
-6. `status` 新页面一律为 `draft`，不写 `active`
+6. `created` 和 `updated` 为当前日期
 
 ## Entity 页面（人物/组织/模型等）
 
@@ -68,11 +72,13 @@ status: draft
 ---
 tags:
   - <类型标签>
-source: "[[raw/<源文件路径>#lines <a>-<b>]]"
+sources:
+  - "[[raw/<源文件路径>#lines <a>-<b>]]"
 aliases:
   - <中文译名或缩写>
 confidence: high | medium | low
-status: draft
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
 ---
 
 <一句话：这是谁/什么>
@@ -85,7 +91,9 @@ status: draft
 
 - [[相关概念或实体]]
 
-## 原文引用
+## 更新记录
 
-<源文中该实体的原始段落，只追加不删改>
+| 日期 | 来源 | 变化 |
+|------|------|------|
+| YYYY-MM-DD | [[raw/<源文件路径>#lines <a>-<b>]] | 初始创建 |
 ```

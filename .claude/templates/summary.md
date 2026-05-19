@@ -2,9 +2,9 @@
 tags:
   - summary
   - <领域/主题>
-source: "[[raw/<源文件路径>]]"
+sources:
+  - "[[raw/<源文件路径>]]"
 confidence: high | medium | low
-status: draft
 date: YYYY-MM-DD
 ---
 

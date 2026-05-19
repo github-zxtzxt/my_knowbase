@@ -1,12 +1,14 @@
 ---
 tags:
   - <领域>
-source: "[[raw/<源文件路径>#lines <a>-<b>]]"
+sources:
+  - "[[raw/<源文件路径>#lines <a>-<b>]]"
 aliases:
   - <别名1>
   - <别名2>
 confidence: high | medium | low
-status: draft
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
 ---
 
 <一句话定义。>
@@ -41,8 +43,8 @@ $$
 - 前置：[[xxx]]
 - 相关：[[yyy]]
 
-## 原文引用
+## 更新记录
 
-<!-- 源文中该概念对应的原文片段，只追加不删改 -->
-
-<源文原文>
+| 日期 | 来源 | 变化 |
+|------|------|------|
+| YYYY-MM-DD | [[raw/<源文件路径>#lines <a>-<b>]] | 初始创建 |
