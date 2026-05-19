@@ -7,6 +7,7 @@ aliases:
   - <别名1>
   - <别名2>
 confidence: high | medium | low
+related_errors: []
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 ---

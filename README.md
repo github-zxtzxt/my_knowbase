@@ -1,210 +1,131 @@
 # Knowbase — 你的知识副脑
 
-> 受 Andrej Karpathy 提出的 [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) 理念启发，基于 Claude Code 构建的个人知识管理系统。不是 RAG，不是笔记软件——而是一个 **AI 持续维护、自动生长、越用越聪明**的结构化第二大脑。
+> 受 Karpathy [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) 理念启发，参考 gbrain / nvk / atomicstrata / wiki-kb 的设计，基于 Claude Code 构建的个人知识管理系统。
+
+不是 RAG——知识**编译一次，持续复用，复利增长**。
 
 ## 为什么不是 RAG
 
-RAG 是"每次提问现翻书找答案"，翻完就忘。LLM Wiki 是"读一遍就记住，整理好，以后直接回答"。知识在这里**编译一次，持续复用，复利增长**。
-
-```
-你提供素材 (raw/)  ──Claude 编译──▶  结构化 Wiki (wiki/)  ──直接问答──▶  高质量回答 & 归档 (outputs/)
-                                          │
-                                          └── 复盘认知偏差 (wiki/errors/)  ← 本项目的独特能力
-```
+RAG 每次提问现翻书找答案，翻完就忘。Knowbase 事先读完素材，编译为结构化 wiki，后续所有提问直接基于 wiki 回答。wiki 页面链回 raw 源文，可随时穿透对证。
 
 ## 目录结构
 
 ```
-├── raw/             # 原始素材（只读，手动放入）
-│   └── articles/    #   DeepSeek 对话记录、文章等
-├── wiki/            # 编译后的知识库（Claude 维护）
-│   ├── _index.md    #   总索引
-│   ├── concepts/    #   概念页
-│   ├── entities/    #   实体页（人物、产品、公司）
-│   ├── summaries/   #   来源总结页
-│   ├── errors/      #   复盘页面（认知偏差记录）
-│   └── log.md       #   变更日志
-├── outputs/         # 高质量回答归档
-├── .claude/         # Claude Code 配置
-│   ├── commands/    #   自定义 slash 命令
-│   ├── skills/      #   自定义 skill
-│   └── settings.json
-└── CLAUDE.md        # 项目指令（Claude 行为规范）
+├── raw/                 # 原始素材（只读）
+│   └── articles/        #   文章、教程、DeepSeek 对话
+├── wiki/                # 编译后的知识库
+│   ├── _index.md        #   总索引
+│   ├── concepts/        #   概念页 + _index.md
+│   ├── entities/        #   实体页 + _index.md
+│   ├── summaries/       #   来源总结页
+│   ├── errors/          #   认知偏差追踪 + _index.md
+│   └── log.md           #   操作日志
+├── outputs/             # 高质量回答 & 对话总结归档
+├── tmp/                 # Ingest 中间产物（concepts.yaml 概念表）
+├── .claude/             # Claude Code 配置
+│   ├── commands/        #   slash 命令（ingest / query / lint / reflect / reingest）
+│   ├── prompts/         #   sub-agent prompt
+│   ├── templates/       #   wiki 页面模板
+│   └── scripts/         #   Python 工具脚本
+└── CLAUDE.md            #   项目指令
 ```
 
-Wiki 文件使用 Obsidian 兼容的 `[[双向链接]]`，可直接用 Obsidian 打开浏览。
+Wiki 文件使用 Obsidian 兼容的 `[[双向链接]]`。
 
-## 前置条件
+## 命令
 
-- [Claude Code](https://claude.ai/code) CLI（项目指令写在 `CLAUDE.md` 中，Claude Code 启动时自动加载）
-- （可选）[Obsidian](https://obsidian.md) — 可视化浏览 Wiki 链接网络
-- （仅 `/fetch_deepseek`）Python + Playwright：`pip install playwright && playwright install chromium`
+| 命令 | 说明 |
+|------|------|
+| `/ingest [path]` | 编译源文为 wiki。LLM 通读 → 写概念表 → 并行 Writer sub-agent 生成 |
+| `/query [--quick\|--deep]` | 3 跳导航检索 wiki。`--deep` 穿透到 raw 对证。`--save` 归档回答 |
+| `/lint` | 健康检查：YAML 合法性、断链、wiki→raw 链接、更新记录、孤立页面、矛盾 |
+| `/reflect [file]` | 复盘对话：提炼知识沉淀 + 追踪认知偏差。整合了对话总结与错误追踪 |
+| `/reingest <file>` | 重新摄入已更新的文件 |
+| `/fetch_deepseek <url>` | 拉取 DeepSeek 分享对话到 raw/ |
 
 ## 初始化
 
 ```bash
 git clone <your-repo-url> my-knowbase
 cd my-knowbase
-mkdir -p raw/articles wiki/concepts wiki/entities wiki/summaries wiki/errors outputs
+mkdir -p raw/articles wiki/concepts wiki/entities wiki/summaries wiki/errors outputs tmp
 claude
 ```
 
-Claude Code 启动后自动加载 `CLAUDE.md` 中的全部指令，无需额外配置。
+Claude Code 启动后自动加载 `CLAUDE.md`，无需额外配置。
 
 ## 使用方式
 
-### 四大核心操作
-
-| 操作 | 命令 | 说明 |
-|------|------|------|
-| **Ingest（摄入）** | `/ingest` | 读取原始素材，编译为结构化 Wiki，更新索引 |
-| **Query（提问）** | 直接提问 | 基于已编译的 Wiki 回答，不重新翻 raw/ |
-| **Lint（检查）** | `/lint` | 健康检查：断链、矛盾、孤立页面、YAML 合法性 |
-| **Reflect（复盘）** | `/reflect` | 🧠 从对话中提取认知偏差，追踪复现——这是本项目对 LLM Wiki 的独特扩展 |
-
-### 额外命令
-
-| 命令 | 说明 |
-|------|------|
-| `/fetch_deepseek` | 拉取 DeepSeek 分享对话到 `raw/articles/` |
-| `/reingest` | 重新摄入已更新的文件 |
-
-## 常规使用
-
-### 放入原始素材
-
-将你想要编译成结构化知识的内容（文章、教程、笔记等）放入 `raw/articles/`：
-
-```bash
-cp ~/Downloads/some-article.md raw/articles/
-# 或直接拖拽文件到 raw/articles/ 目录
-```
-
-素材可以是任意 Markdown 文件，没有格式限制。
-
 ### 摄入编译
-
-在 Claude Code 中说：
 
 ```
 /ingest raw/articles/some-article.md
 ```
 
-或者直接 `/ingest`，Claude 会自动扫描 `raw/` 下未处理的新文件。
+Claude 通读全文 → 生成 `tmp/concepts.yaml` 概念表（可人工修改） → 每个概念由独立 sub-agent 并行生成 wiki 页面 → 更新索引和 log。
 
-Claude 会：
-1. 用中文给出不超过 5 个要点的高层总结
-2. 提取关键实体（人物、公司、产品、技术术语）
-3. 提取核心概念，在 `wiki/concepts/` 下创建概念页
-4. 在 `wiki/summaries/` 下创建来源总结页
-5. 更新 `wiki/_index.md` 的索引和交叉链接
+每个 wiki 页面包含：
+- **sources** — 指向 raw/ 源文件#行号，支持多来源
+- **aliases** — 中文译名、缩写、别称
+- **confidence** — high / medium / low
+- **## 更新记录** — 只追加的时间追踪表
 
-### 基于 Wiki 提问
-
-摄入完成后，直接基于 Wiki 提问：
+### 提问
 
 ```
-Rust 的所有权和 Go 的 GC 有什么区别？
-trait 和 interface 的对比？
+/query --deep self-attention 的原理是什么
 ```
 
-Claude 会优先基于已编译的 Wiki 回答，不会重新翻 `raw/`。如果信息不足，会主动建议你摄入相关新素材。
+默认 3 跳导航（_index → 分类 index → 3-8 篇文章），不翻 raw。不确定时说"wiki 暂无记录"并建议 ingest，不靠训练知识编造。回答引用 sources。
 
-### 归档高质量回答
-
-如果某次回答质量很高，可以主动让 Claude 归档：
+### 复盘
 
 ```
-把刚才的回答归档到 outputs/
+/reflect              # 复盘当前对话
+/reflect raw/articles/xxx.md  # 复盘指定文件
 ```
 
-或者 Claude 觉得某次回答质量高时，会主动建议归档。
-
-### 更新已有素材
-
-如果 `raw/` 中的某个文件被更新了：
-
-```
-/reingest raw/articles/some-article.md
-```
-
-Claude 会重新读取并更新相关的 Wiki 页面。
+产出：对话总结（outputs/） + 错误追踪（wiki/errors/，含复现次数）。Query 时自动检查涉及概念的已知错误并提醒。
 
 ### 健康检查
 
-定期运行 `/lint`，检查：
-- YAML frontmatter 合法性（自动运行验证脚本）
-- 断开的 `[[双向链接]]`
-- 不同来源对同一概念相互矛盾的定义
-- 孤立页面（没有其他页面链接到它）
-- 有过时倾向的描述
-
-## 特色功能：DeepSeek 对话学习 + 认知偏差复盘
-
-这是本项目对 Karpathy LLM Wiki 三层架构（Ingest / Query / Lint）的**第四层扩展**——不只是整理知识，还能帮你从对话中发现并纠正认知盲区。
-
 ```
-DeepSeek 分享链接 ──fetch──▶  raw/articles/*.md  ──ingest──▶  wiki/  ──reflect──▶  wiki/errors/
-                        (拉取对话)               (编译知识)              (复盘认知偏差)
-```
-
-### 1. 拉取对话
-
-```
-/fetch_deepseek <DeepSeek 分享链接>
-```
-
-需要 DeepSeek 的**分享链接**（格式：`https://chat.deepseek.com/share/...`），在 DeepSeek 网页端对话中点击"分享"即可获取。调用 Playwright 脚本从分享页提取完整对话，保存为 Markdown 到 `raw/articles/`，文件保留原始对话格式（`**用户**：` / `**助手**：`），后续复盘依赖此格式。
-
-### 2. 摄入编译
-
-```
-/ingest
-```
-
-扫描 `raw/` 下未处理的新文件，提取概念和实体，编译为 Wiki 页面。这会创建 `wiki/summaries/` 来源总结页，并增量更新概念页和实体页。
-
-### 3. 复盘偏差
-
-```
-/reflect
-```
-
-**仅针对 DeepSeek 对话文件**（自动检测 `**用户**：` / `**助手**：` 格式，知识型文档直接跳过）。从对话中提取用户的认知偏差（概念误解、计算错误、思路中断等），执行偏差复现追踪，沉淀到 `wiki/errors/`。
-
-如果对话中没有被纠正的错误或明显偏差，复盘结果为空（"未发现需要复盘的内容"），不强制生成复盘页面。
-
-### 典型工作流示例
-
-```
-# 1. 看到一篇有价值的 DeepSeek 对话，分享链接
-/fetch_deepseek https://chat.deepseek.com/share/xxxxx
-# → 输出：已保存到 raw/articles/xxxxx.md
-
-# 2. 摄入对话内容，编译为 Wiki
-/ingest
-# → Claude 总结要点，创建概念页，更新索引
-
-# 3. 复盘对话中的认知偏差
-/reflect
-# → 自动扫描未复盘的对话，提取偏差，追踪复现
-
-# 4. 定期维护
 /lint
-# → 检查断链、矛盾、孤立页面
 ```
 
-## Wiki 规范
+检查：YAML 语法、断链、wiki→raw 链接完整性、`## 更新记录` 存在性、孤立页面、矛盾信息。
 
-- 文件名：英文小写 + 连字符，如 `self-attention.md`
+## Wiki 页面 frontmatter 规范
+
+```yaml
+tags: [nlp, transformer]
+sources:
+  - "[[raw/articles/happy_llm/chapter2/chapter2-transformer#lines 5-151]]"
+aliases:
+  - 注意力机制
+confidence: high
+related_errors: []
+created: 2026-05-19
+updated: 2026-05-19
+```
+
+- 文件命名：英文小写 + 连字符
 - 每个页面首段为摘要
-- 使用 `[[双向链接]]` 连接所有页面
-- YAML frontmatter 包含 `tags` 和 `source`
-- 新知识与现有内容矛盾时，标记 `⚠️ 待确认的矛盾`，不直接覆盖
+- 用 `[[双向链接]]` 连接 wiki 网络
+- YAML 中含 `[[wikilink]]` 必须用引号包裹
+- 新知识与已有内容矛盾时标记 `⚠️ 待确认的矛盾`，不直接覆盖
+- 生成/修改 wiki 后运行 `validate-yaml.py`
+
+## 架构原则
+
+1. **Sub-agent 隔离**：每个概念由独立 Writer 在隔离 context 生成，防止注意力稀释
+2. **不做内容闸门**：不验字面一致性。页面 source 链回 raw，读者可对证原文
+3. **概念表中间可改**：`tmp/concepts.yaml` 人工调整后重跑 Phase 2，无需重读全文
+4. **只增不改**：ingest 只创建新文件和追加索引，不覆盖已有页面
 
 ## 与 Obsidian 配合
 
-用 Obsidian 打开项目根目录，可以看到所有 Wiki 页面的链接图谱。`.obsidian/` 目录已包含基础配置。
+用 Obsidian 打开项目根目录，可浏览 wiki 链接图谱。`.obsidian/` 已包含基础配置。
 
 ## 许可
 

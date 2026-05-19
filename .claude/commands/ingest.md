@@ -139,7 +139,10 @@ Writer 完成后，orchestrator 把输出写入对应 `wiki/` 路径。
 新增: A / 合并: B
 ```
 
-2. 更新 `wiki/_index.md`（追加新页面条目，按概念/实体/来源总结分区）
+2. 更新索引：
+   - 更新 `wiki/_index.md`（追加新页面条目，按概念/实体/来源总结分区）
+   - 创建或更新 `wiki/concepts/_index.md`（列出所有概念页）
+   - 创建或更新 `wiki/entities/_index.md`（列出所有实体页）
 3. 更新 `wiki/log.md`（追加本次 ingest 记录，同步更新其 frontmatter `updated` 日期）
 4. 将 `tmp/concepts.yaml` 中 `ingested` 改为 `true`，`source_hash` 写入当前源文 SHA-256
 5. 运行 `python .claude/scripts/validate-yaml.py` 校验所有 wiki 页面 YAML frontmatter 合法
