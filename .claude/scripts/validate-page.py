@@ -10,7 +10,9 @@
 4. 数量覆盖：代码块/公式数量达标
 
 Usage:
-  python validate-page.py --source <file> --range <a>:<b> --page <page.md>
+  python validate-page.py --source <file> --range <a>:<b> [--range <c>:<d> ...] --page <page.md>
+
+Multiple --range flags are concatenated into one source segment for validation.
 
 Exit code: 0 = PASS, 1 = FAIL
 """
@@ -202,13 +204,19 @@ def check_coverage(page_code, page_formulas, src_code_n, src_formula_n):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", required=True)
-    ap.add_argument("--range", required=True, help="a:b")
+    ap.add_argument("--range", action="append", required=True, help="a:b (can be repeated)")
     ap.add_argument("--page", required=True)
     args = ap.parse_args()
 
-    a, b = map(int, args.range.split(":"))
+    ranges = []
+    for r in args.range:
+        a, b = map(int, r.split(":"))
+        ranges.append((a, b))
     src_lines = Path(args.source).read_text(encoding="utf-8").splitlines()
-    source_segment = "\n".join(src_lines[a - 1 : b])
+    segments = []
+    for a, b in ranges:
+        segments.append("\n".join(src_lines[a - 1 : b]))
+    source_segment = "\n".join(segments)
     page_text = Path(args.page).read_text(encoding="utf-8")
 
     src_code = extract_code_blocks(source_segment)
