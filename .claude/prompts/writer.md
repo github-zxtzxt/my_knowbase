@@ -8,8 +8,11 @@
 ---
 tags:
   - <领域标签>
-source: "[[<来源页slug>]]"
-source_range: "lines <a>-<b>"
+source: "[[raw/<源文件路径>#lines <a>-<b>]]"
+aliases:
+  - <中文译名或缩写>
+confidence: high | medium | low
+status: draft
 ---
 
 <一句话定义>
@@ -33,7 +36,7 @@ source_range: "lines <a>-<b>"
 <原样复制每个代码块，每个后面 1-2 句说明>
 ```
 
-最后加：
+然后加关联节：
 ```markdown
 ## 关联
 
@@ -41,11 +44,21 @@ source_range: "lines <a>-<b>"
 - 相关：[[yyy]]
 ```
 
+最后必须加原文引用节：
+```markdown
+## 原文引用
+
+<源文中该概念对应的原始段落，只追加不删改>
+```
+
 ## 铁律
 
 1. 已提取的代码块和公式原样复制，一字不改
-2. 页面中的每个具体声明必须能在源文片段中找到
-3. 源文没说的，不写
+2. `source` 必须指向 `raw/` 下的源文件路径 + 行号，不可指向另一个 wiki 页
+3. `## 原文引用` 节必须保留源文原始段落，不可省略
+4. `confidence` 根据信息充分程度和源文清晰度标注：high（源文详细且明确）/ medium（信息较简略）/ low（源文仅提及但缺乏细节）
+5. `aliases` 列出概念的中文译名、缩写、别称等，方便搜索和 Obsidian 发现
+6. `status` 新页面一律为 `draft`，不写 `active`
 
 ## Entity 页面（人物/组织/模型等）
 
@@ -55,8 +68,11 @@ source_range: "lines <a>-<b>"
 ---
 tags:
   - <类型标签>
-source: "[[<来源页slug>]]"
-source_range: "lines <a>-<b>"
+source: "[[raw/<源文件路径>#lines <a>-<b>]]"
+aliases:
+  - <中文译名或缩写>
+confidence: high | medium | low
+status: draft
 ---
 
 <一句话：这是谁/什么>
@@ -68,4 +84,8 @@ source_range: "lines <a>-<b>"
 ## 关联
 
 - [[相关概念或实体]]
+
+## 原文引用
+
+<源文中该实体的原始段落，只追加不删改>
 ```
